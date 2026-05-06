@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=yes">
+    <title>全屏日志智能诊断 | AI故障定位系统</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700&display=swap" rel="stylesheet">
+    <style>
+        /* 全屏重置 - 无底栏版本 */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            height: 100%;
+            width: 100%;
+            overflow: hidden;
+        }
+
+        body {
+            background: #f0f4f9;
+            font-family: 'Inter', sans-serif;
+            color: #1e293b;
+            line-height: 1.5;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* 主容器占满全屏，无底部区域 */
+        .fullscreen-container {
+            width: 100%;
+            height: 100%;
+            background: white;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            border-radius: 0;
+        }
+
+        /* 头部区域 - 固定不滚动 */
+        .header {
+            background: linear-gradient(135deg, #0f2b3d 0%, #1b4f6e 100%);
+            padding: 1.2rem 2rem;
+            color: white;
+            flex-shrink: 0;
+        }
+
+        .header h1 {
+            font-size: 1.6rem;
+            font-weight: 700;
+            letter-spacing: -0.2px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .header h1 i {
+            font-size: 1.8rem;
+            background: rgba(255,255,255,0.15);
+            padding: 6px;
+            border-radius: 16px;
+        }
+
+        .sub {
+            margin-top: 8px;
+            opacity: 0.85;
+            font-weight: 500;
+            font-size: 0.85rem;
+            border-left: 3px solid #5ee0fa;
+            padding-left: 12px;
+        }
+
+        /* 主体区域 - 占据剩余全部高度，内部滚动 */
+        .dashboard {
+            flex: 1;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1.5rem;
+            padding: 1.5rem 2rem;
+            overflow-y: auto;
+            min-height: 0;
+            align-items: stretch;
+        }
+
+        /* 左侧上传区 */
+        .input-panel {
+            flex: 1.2;
+            min-width: 260px;
+            background: #ffffff;
+            border-radius: 1.5rem;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.04);
+            border: 1px solid #eef2f8;
+            display: flex;
+            flex-direction: column;
+            height: fit-content;
+        }
+
+        /* 右侧结果区 */
+        .result-panel {
+            flex: 2;
+            min-width: 300px;
+            background: #ffffff;
+            border-radius: 1.5rem;
+            border: 1px solid #eef2f8;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.04);
+            display: flex;
+            flex-direction: column;
+            height: fit-content;
+        }
+
+        .section-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            padding: 1rem 1.5rem 0.4rem 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border-bottom: 2px solid #eef2f6;
+            margin-bottom: 0.8rem;
+            flex-shrink: 0;
+        }
+
+        .section-title i {
+            color: #2c7da0;
+            font-size: 1.2rem;
+        }
+
+        .upload-area {
+            margin: 0 1.5rem 1rem 1.5rem;
+            border: 2px dashed #cbd5e1;
+            border-radius: 1.2rem;
+            background: #fafcff;
+            padding: 1.5rem 0.8rem;
+            text-align: center;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        .upload-area:hover {
+            border-color: #2c7da0;
+            background: #f0f9ff;
+        }
+
+        .upload-area i {
+            font-size: 2rem;
+            color: #5f9db2;
+            margin-bottom: 8px;
+        }
+
+        .file-info {
+            background: #f1f5f9;
+            margin: 0 1.5rem 0.8rem 1.5rem;
+            padding: 0.5rem 1rem;
+            border-radius: 60px;
+            font-size: 0.8rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .textarea-log {
+            margin: 0 1.5rem 1rem 1.5rem;
+        }
+
+        .textarea-log label {
+            font-weight: 500;
+            font-size: 0.8rem;
+            display: block;
+            margin-bottom: 6px;
+        }
+
+        textarea {
+            width: 100%;
+            border-radius: 1rem;
+            border: 1px solid #cfdfe9;
+            padding: 10px;
+            font-family: 'Menlo', monospace;
+            font-size: 0.75rem;
+            background: #fefefe;
+            resize: vertical;
+        }
+
+        .btn-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin: 0.5rem 1.5rem 1.2rem 1.5rem;
+        }
+
+        .btn-primary {
+            background: #0f2b3d;
+            border: none;
+            color: white;
+            padding: 10px 18px;
+            border-radius: 40px;
+            font-weight: 600;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: 0.2s;
+            flex: 1;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn-primary:hover {
+            background: #1b4f6e;
+            transform: scale(0.98);
+        }
+
+        .btn-outline {
+            background: transparent;
+            border: 1px solid #cbdde8;
+            padding: 8px 14px;
+            border-radius: 40px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: 0.2s;
+            flex: 1;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .example-buttons {
+            margin: 0 1.5rem 1.5rem 1.5rem;
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            border-top: 1px solid #eef2f6;
+            padding-top: 1rem;
+        }
+
+        .badge-example {
+            background: #eef2ff;
+            padding: 6px 12px;
+            border-radius: 40px;
+            font-size: 0.7rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .result-card {
+            margin: 0 1.2rem 1.5rem 1.2rem;
+            flex: 1;
+        }
+
+        .result-item {
+            margin-bottom: 1.2rem;
+            border-radius: 1rem;
+            background: #f9fbfd;
+            padding: 0.9rem 1.2rem;
+            border-left: 4px solid;
+            transition: 0.1s;
+        }
+
+        .result-item.summary { border-left-color: #3b82f6; }
+        .result-item.cause { border-left-color: #f97316; }
+        .result-item.solution { border-left-color: #10b981; }
+
+        .result-header {
+            font-weight: 700;
+            font-size: 0.9rem;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .result-content {
+            font-size: 0.85rem;
+            line-height: 1.45;
+            color: #1e2f3a;
+        }
+
+        .command-box {
+            background: #0f172a;
+            color: #e2e8f0;
+            padding: 8px 12px;
+            border-radius: 14px;
+            font-family: monospace;
+            font-size: 0.75rem;
+            margin: 10px 0 6px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .copy-btn {
+            background: #334155;
+            border: none;
+            padding: 4px 10px;
+            border-radius: 30px;
+            color: white;
+            font-size: 0.65rem;
+            cursor: pointer;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: #5f8ea0;
+        }
+
+        /* 移动端紧凑调整 */
+        @media (max-width: 860px) {
+            .header {
+                padding: 0.9rem 1rem;
+            }
+            .dashboard {
+                padding: 1rem;
+                gap: 1rem;
+            }
+            .section-title {
+                padding: 0.8rem 1rem 0.2rem 1rem;
+            }
+            .upload-area, .textarea-log, .btn-group, .example-buttons, .result-card {
+                margin-left: 1rem;
+                margin-right: 1rem;
+            }
+            .btn-primary, .btn-outline {
+                width: 100%;
+            }
+        }
+
+        @media (max-width: 600px) {
+            .command-box {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .toast-msg {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #1e293b;
+            color: white;
+            padding: 8px 18px;
+            border-radius: 40px;
+            font-size: 0.75rem;
+            z-index: 999;
+            opacity: 0;
+            transition: opacity 0.2s;
+            pointer-events: none;
+            white-space: normal;
+            text-align: center;
+            max-width: 90vw;
+        }
+    </style>
+</head>
+<body>
+<div class="fullscreen-container">
+    <div class="header">
+        <h1>
+            <i class="fas fa-microchip"></i> 
+            日志分析与故障定位系统
+        </h1>
+        <div class="sub">
+            <i class="fas fa-robot"></i> 全屏智能排障 · 让报错像翻译一样易懂
+        </div>
+    </div>
+
+    <div class="dashboard">
+        <!-- 左侧输入面板 -->
+        <div class="input-panel">
+            <div class="section-title">
+                <i class="fas fa-cloud-upload-alt"></i> 
+                <span>日志来源</span>
+            </div>
+            <div id="dropZone" class="upload-area">
+                <i class="fas fa-file-alt"></i>
+                <p><strong>点击或拖拽日志文件</strong> (.log / .txt)</p>
+                <p style="font-size:0.7rem;">自动提取错误上下文</p>
+                <input type="file" id="fileInput" accept=".log,.txt,text/plain" style="display: none;" />
+            </div>
+            <div id="fileStatus" class="file-info hidden">
+                <span><i class="fas fa-check-circle"></i> <span id="fileName"></span></span>
+                <button id="clearFileBtn" style="background: none; border:none; cursor:pointer;"><i class="fas fa-times-circle"></i></button>
+            </div>
+
+            <div class="textarea-log">
+                <label><i class="fas fa-terminal"></i> 粘贴报错日志或终端信息</label>
+                <textarea id="logTextarea" rows="5" placeholder="示例：&#10;------ kernel abnormal reboot records ------&#10;kernel poweroff   : AP_WDT&#10;ERROR 2003 (HY000): Can't connect to MySQL server on 'localhost' (10061)"></textarea>
+            </div>
+
+            <div class="btn-group">
+                <button id="analyzeBtn" class="btn-primary"><i class="fas fa-brain"></i> 智能诊断</button>
+                <button id="clearBtn" class="btn-outline"><i class="fas fa-eraser"></i> 清空</button>
+            </div>
+
+            <div class="example-buttons">
+                <span style="font-size:0.7rem; color:#5f7d8f;">📋 快速案例：</span>
+                <span class="badge-example" data-demo="reboot"><i class="fas fa-mobile-alt"></i> 手机重启</span>
+                <span class="badge-example" data-demo="mysql"><i class="fas fa-database"></i> MySQL连不上</span>
+                <span class="badge-example" data-demo="wdt"><i class="fas fa-microchip"></i> 看门狗超时</span>
+            </div>
+        </div>
+
+        <!-- 右侧诊断结果 -->
+        <div class="result-panel">
+            <div class="section-title">
+                <i class="fas fa-stethoscope"></i>
+                <span>AI 智能诊断结果</span>
+                <span style="font-size:0.65rem; margin-left:auto; background:#eef2ff; padding:2px 8px; border-radius:40px;"><i class="fas fa-magic"></i> 上下文推理</span>
+            </div>
+            <div id="resultContainer" class="result-card">
+                <div style="text-align: center; padding: 2rem 0.5rem; color: #94a3b8;">
+                    <i class="fas fa-robot" style="font-size: 2.2rem; margin-bottom: 1rem; display: block;"></i>
+                    上传日志或点击案例，AI将分析根因<br>输出摘要 · 定位 · 可执行修复命令
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- 底栏已完全移除 -->
+</div>
+<div id="toastMsg" class="toast-msg"></div>
+
+<script>
+    // ---------- 智能诊断核心 (模拟AI推理，覆盖多种典型故障) ----------
+    function mockAIDiagnosis(rawLogText) {
+        if (!rawLogText || rawLogText.trim() === "") {
+            return {
+                summary: "未检测到有效日志内容",
+                cause: "请提供报错日志或终端输出信息，以便AI分析根本原因。",
+                solution: "复制完整错误信息后重新诊断，或使用示例日志体验智能排障。",
+                commands: []
+            };
+        }
+        const lowerLog = rawLogText.toLowerCase();
+        // 内核看门狗 / 手机自动重启 (AP_WDT / Power_keys / watchdog)
+        if (lowerLog.includes("ap_wdt") || (lowerLog.includes("kernel abnormal reboot") || lowerLog.includes("power_keys_long_press") || (lowerLog.includes("watchdog") && lowerLog.includes("reboot")) || lowerLog.includes("soft lockup"))) {
+            return {
+                summary: "内核因应用看门狗（AP_WDT）超时而主动关机并重启",
+                cause: "系统关键进程未及时喂狗，触发硬件超时复位。常见于系统高负载、进程死锁或驱动异常。",
+                solution: "1. 抓取超时前的进程调用栈（ramoops/pstore）\n2. 检查最近安装的应用或系统更新，卸载可疑软件或回滚\n3. 若频繁发生，备份数据恢复出厂设置；仍无效可能为主板硬件故障。",
+                commands: ["cat /sys/fs/pstore/console-ramoops", "dmesg | grep -i watchdog", "logcat -b events | grep -i watchdog   # Android环境"]
+            };
+        }
+        // MySQL 连接错误 2003 / 10061 / connection refused
+        else if (lowerLog.includes("error 2003") || lowerLog.includes("can't connect to mysql") || lowerLog.includes("10061") || (lowerLog.includes("mysql") && lowerLog.includes("connection refused"))) {
+            return {
+                summary: "应用程序连接本地MySQL数据库失败，网络层拒绝连接",
+                cause: "MySQL服务未启动，或3306端口被防火墙/iptables拦截。日志关键词 'Connection refused' 确认TCP握手失败。",
+                solution: "启动MySQL服务并放行防火墙端口，验证监听状态。",
+                commands: ["systemctl status mysql", "systemctl start mysql", "ufw allow 3306", "netstat -tlnp | grep 3306"]
+            };
+        }
+        // 内核panic / Oops
+        else if (lowerLog.includes("kernel panic") || lowerLog.includes("oops") || lowerLog.includes("bug: soft lockup")) {
+            return {
+                summary: "系统内核发生致命错误导致崩溃或重启",
+                cause: "内核空指针异常、驱动不兼容或内存损坏，常与第三方内核模块或硬件故障有关。",
+                solution: "收集kdump/crash转储，分析vmcore；尝试升级内核或回滚驱动；运行内存诊断工具。",
+                commands: ["journalctl -k -b -1 | tail -100", "crash /var/crash/vmcore /usr/lib/debug/boot/vmlinux", "mcelog --client"]
+            };
+        }
+        // 通用网络连接超时/拒绝 (非MySQL)
+        else if (lowerLog.includes("connection refused") || lowerLog.includes("timeout") || (lowerLog.includes("failed") && lowerLog.includes("port"))) {
+            return {
+                summary: "网络连接失败，目标服务无响应或被拒绝",
+                cause: "服务未监听端口、防火墙规则拦截或网络路由配置错误。",
+                solution: "检查目标服务状态，验证防火墙配置及端口监听，使用telnet/nc测试连通性。",
+                commands: ["ss -tlnp | grep :端口号", "systemctl status 服务名", "iptables -L -n", "telnet 目标IP 端口"]
+            };
+        }
+        // 应用异常栈 (Java/Python/Node)
+        else if (lowerLog.includes("exception") || lowerLog.includes("stacktrace") || lowerLog.includes("nullpointer") || lowerLog.includes("error:")) {
+            let lang = lowerLog.includes("java") ? "Java" : (lowerLog.includes("python") ? "Python" : (lowerLog.includes("node") ? "Node.js" : "应用"));
+            return {
+                summary: `${lang}应用运行时抛出未处理异常，导致功能中断`,
+                cause: "代码逻辑错误、空指针、依赖缺失或配置不当，根据异常栈可定位具体类与方法。",
+                solution: "检查异常链，定位首个Caused by异常；修复空指针/数组越界或资源未关闭问题，增强容错。",
+                commands: ["grep -A 20 'Exception' app.log", "修复后重新构建部署", "增加try-catch并记录详细上下文"]
+            };
+        }
+        // 默认通用智能解析
+        else {
+            return {
+                summary: "日志中检测到异常信号，需结合上下文进一步排查",
+                cause: "AI识别到非预期行为，可能源于配置、权限或资源瓶颈。未匹配标准故障签名，建议查阅完整日志。",
+                solution: "检查系统资源(CPU/内存/磁盘)，查看日志前后时间窗口；可使用故障知识库搜索核心关键词。",
+                commands: ["dmesg -T | tail -30", "journalctl -xe -n 50", "grep -E 'ERROR|FATAL|CRITICAL' /var/log/syslog"]
+            };
+        }
+    }
+
+    // 辅助显示诊断结果
+    function displayResult(result) {
+        const container = document.getElementById("resultContainer");
+        if (!container) return;
+
+        let commandsHtml = "";
+        if (result.commands && result.commands.length) {
+            commandsHtml = `<div style="margin-top: 10px;"><div style="font-weight:500; margin-bottom: 5px; font-size:0.8rem;">📋 可执行命令</div>`;
+            result.commands.forEach(cmd => {
+                commandsHtml += `
+                    <div class="command-box">
+                        <code style="word-break:break-all;">${escapeHtml(cmd)}</code>
+                        <button class="copy-btn" data-cmd="${escapeHtml(cmd)}"><i class="fas fa-copy"></i> 复制</button>
+                    </div>
+                `;
+            });
+            commandsHtml += `</div>`;
+        }
+
+        const html = `
+            <div class="result-item summary">
+                <div class="result-header"><i class="fas fa-quote-left" style="color:#3b82f6"></i> 📄 问题摘要</div>
+                <div class="result-content">${escapeHtml(result.summary)}</div>
+            </div>
+            <div class="result-item cause">
+                <div class="result-header"><i class="fas fa-search" style="color:#f97316"></i> 🔍 原因定位</div>
+                <div class="result-content">${escapeHtml(result.cause)}</div>
+            </div>
+            <div class="result-item solution">
+                <div class="result-header"><i class="fas fa-tools" style="color:#10b981"></i> 🛠️ 解决方案</div>
+                <div class="result-content">${escapeHtml(result.solution).replace(/\n/g, '<br>')}</div>
+                ${commandsHtml}
+            </div>
+        `;
+        container.innerHTML = html;
+
+        // 绑定复制按钮事件
+        document.querySelectorAll('.copy-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const cmd = btn.getAttribute('data-cmd');
+                if (cmd) {
+                    navigator.clipboard.writeText(cmd).then(() => {
+                        showToast(`✅ 命令已复制: ${cmd.substring(0, 50)}${cmd.length>50?'…':''}`);
+                    }).catch(() => {
+                        showToast("⚠️ 手动复制");
+                    });
+                }
+            });
+        });
+    }
+
+    function escapeHtml(str) {
+        if (!str) return "";
+        return str.replace(/[&<>]/g, function(m) {
+            if (m === '&') return '&amp;';
+            if (m === '<') return '&lt;';
+            if (m === '>') return '&gt;';
+            return m;
+        });
+    }
+
+    function showToast(msg, duration = 2500) {
+        const toast = document.getElementById("toastMsg");
+        toast.textContent = msg;
+        toast.style.opacity = "1";
+        setTimeout(() => {
+            toast.style.opacity = "0";
+        }, duration);
+    }
+
+    let currentFileContent = null;
+
+    async function getLogContent() {
+        if (currentFileContent) return currentFileContent;
+        const textareaVal = document.getElementById("logTextarea").value;
+        if (textareaVal.trim()) return textareaVal;
+        return "";
+    }
+
+    async function runDiagnosis() {
+        const resultContainer = document.getElementById("resultContainer");
+        resultContainer.innerHTML = `<div class="loading"><i class="fas fa-spinner fa-pulse"></i> AI正在深度分析日志上下文，推测根本原因...</div>`;
+        let logText = await getLogContent();
+        if (!logText || logText.trim() === "") {
+            resultContainer.innerHTML = `<div style="text-align:center; padding:2rem; color:#e87928;"><i class="fas fa-exclamation-triangle"></i> 没有可分析的日志内容，请上传文件、粘贴报错或点选示例。</div>`;
+            return;
+        }
+        setTimeout(() => {
+            const diagnosis = mockAIDiagnosis(logText);
+            displayResult(diagnosis);
+        }, 500);
+    }
+
+    // 文件处理
+    function handleFile(file) {
+        if (!file) return;
+        if (!file.name.match(/\.(log|txt)$/i) && file.type !== 'text/plain') {
+            showToast("请上传 .log 或 .txt 日志文件");
+            return;
+        }
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            currentFileContent = e.target.result;
+            document.getElementById("fileName").innerText = file.name;
+            document.getElementById("fileStatus").classList.remove("hidden");
+            document.getElementById("logTextarea").value = currentFileContent;
+            showToast(`已加载文件: ${file.name}`);
+        };
+        reader.onerror = () => showToast("文件读取失败");
+        reader.readAsText(file, "UTF-8");
+    }
+
+    function clearAll() {
+        currentFileContent = null;
+        document.getElementById("logTextarea").value = "";
+        document.getElementById("fileStatus").classList.add("hidden");
+        document.getElementById("fileName").innerText = "";
+        document.getElementById("fileInput").value = "";
+        const container = document.getElementById("resultContainer");
+        container.innerHTML = `<div style="text-align: center; padding: 2rem 0.5rem; color: #94a3b8;">
+                                    <i class="fas fa-robot" style="font-size: 2.2rem; margin-bottom: 1rem; display: block;"></i>
+                                    已清空，上传日志或粘贴报错开始分析
+                                </div>`;
+        showToast("已清空所有日志内容");
+    }
+
+    function fillDemo(type) {
+        if (type === 'reboot') {
+            const demoLog = `------ kernel abnormal reboot records ------
+kernel poweroff   : Power_keys_long_press
+record time_stamp : 2026-04-30 14:13:17
+kernel reboot     : reboot_longkey
+record time_stamp : 2026-04-30 14:13:17
+------------------------------------
+kernel poweroff   : AP_WDT
+record time_stamp : 2026-04-30 16:24:25
+kernel reboot     : reboot
+record time_stamp : 2026-04-30 16:24:23`;
+            document.getElementById("logTextarea").value = demoLog;
+            currentFileContent = null;
+            document.getElementById("fileStatus").classList.add("hidden");
+        } else if (type === 'mysql') {
+            const demoMysql = `C:\\Windows\\System32>mysql -u root -p
+Enter password: *********
+ERROR 2003 (HY000): Can't connect to MySQL server on 'localhost' (10061)`;
+            document.getElementById("logTextarea").value = demoMysql;
+            currentFileContent = null;
+            document.getElementById("fileStatus").classList.add("hidden");
+        } else if (type === 'wdt') {
+            const wdtLog = `[   67.330124] watchdog: BUG: soft lockup - CPU#3 stuck for 22s!
+[   67.330411] Kernel panic - not syncing: watchdog: soft lockup
+[   67.330499] CPU: 3 PID: 124 Comm: system_server Tainted: P           O
+[   67.330620] Hardware name: Qualcomm Technologies, Inc. AP_WDT triggered`;
+            document.getElementById("logTextarea").value = wdtLog;
+            currentFileContent = null;
+            document.getElementById("fileStatus").classList.add("hidden");
+        }
+        showToast(`已加载示例: ${type==='reboot'?'手机自动重启':(type==='mysql'?'MySQL连接失败':'内核看门狗超时')}`);
+    }
+
+    // 初始化所有事件
+    function init() {
+        const dropZone = document.getElementById("dropZone");
+        const fileInput = document.getElementById("fileInput");
+        const analyzeBtn = document.getElementById("analyzeBtn");
+        const clearBtn = document.getElementById("clearBtn");
+        const clearFileBtn = document.getElementById("clearFileBtn");
+
+        dropZone.addEventListener("click", () => fileInput.click());
+        dropZone.addEventListener("dragover", (e) => {
+            e.preventDefault();
+            dropZone.style.borderColor = "#2c7da0";
+        });
+        dropZone.addEventListener("dragleave", () => {
+            dropZone.style.borderColor = "#cbd5e1";
+        });
+        dropZone.addEventListener("drop", (e) => {
+            e.preventDefault();
+            dropZone.style.borderColor = "#cbd5e1";
+            if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+        });
+        fileInput.addEventListener("change", (e) => {
+            if (e.target.files.length) handleFile(e.target.files[0]);
+        });
+        analyzeBtn.addEventListener("click", runDiagnosis);
+        clearBtn.addEventListener("click", clearAll);
+        if (clearFileBtn) {
+            clearFileBtn.addEventListener("click", () => {
+                currentFileContent = null;
+                document.getElementById("fileStatus").classList.add("hidden");
+                fileInput.value = "";
+                showToast("已移除文件，当前使用文本框内容");
+            });
+        }
+        document.querySelectorAll(".badge-example").forEach(el => {
+            el.addEventListener("click", (e) => {
+                const type = el.getAttribute("data-demo");
+                if (type) fillDemo(type);
+            });
+        });
+        const textarea = document.getElementById("logTextarea");
+        textarea.addEventListener("input", () => {
+            if (currentFileContent) {
+                currentFileContent = null;
+                document.getElementById("fileStatus").classList.add("hidden");
+            }
+        });
+    }
+
+    init();
+</script>
+</body>
+</html>
