@@ -1,635 +1,555 @@
-<!DOCTYPE html>
+ <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=yes">
-    <title>全屏日志智能诊断 | AI故障定位系统</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>LogMind — 智能日志分析助手</title>
+    <!-- Font Awesome 6 (免费图标库，增加app质感) -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700&display=swap" rel="stylesheet">
     <style>
-        /* 全屏重置 - 无底栏版本 */
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
-        }
-
-        html, body {
-            height: 100%;
-            width: 100%;
-            overflow: hidden;
+            -webkit-tap-highlight-color: transparent;
         }
 
         body {
-            background: #f0f4f9;
-            font-family: 'Inter', sans-serif;
-            color: #1e293b;
-            line-height: 1.5;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            background-color: #f5f7fb;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            color: #1c1e24;
+            line-height: 1.4;
+            padding: 0;
+            margin: 0;
+            /* 模仿 iOS 滑动弹性背景 */
+            overflow-x: hidden;
         }
 
-        /* 主容器占满全屏，无底部区域 */
-        .fullscreen-container {
-            width: 100%;
-            height: 100%;
-            background: white;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-            border-radius: 0;
+        /* 整体容器——原生app卡片质感 */
+        .app-container {
+            max-width: 720px;
+            margin: 0 auto;
+            background-color: #f5f7fb;
+            min-height: 100vh;
+            box-shadow: 0 0 40px rgba(0,0,0,0.02);
+            position: relative;
         }
 
-        /* 头部区域 - 固定不滚动 */
-        .header {
-            background: linear-gradient(135deg, #0f2b3d 0%, #1b4f6e 100%);
-            padding: 1.2rem 2rem;
-            color: white;
-            flex-shrink: 0;
-        }
-
-        .header h1 {
-            font-size: 1.6rem;
-            font-weight: 700;
-            letter-spacing: -0.2px;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            flex-wrap: wrap;
-        }
-
-        .header h1 i {
-            font-size: 1.8rem;
-            background: rgba(255,255,255,0.15);
-            padding: 6px;
-            border-radius: 16px;
-        }
-
-        .sub {
-            margin-top: 8px;
-            opacity: 0.85;
-            font-weight: 500;
-            font-size: 0.85rem;
-            border-left: 3px solid #5ee0fa;
-            padding-left: 12px;
-        }
-
-        /* 主体区域 - 占据剩余全部高度，内部滚动 */
-        .dashboard {
-            flex: 1;
-            display: flex;
-            flex-wrap: wrap;
-            gap: 1.5rem;
-            padding: 1.5rem 2rem;
-            overflow-y: auto;
-            min-height: 0;
-            align-items: stretch;
-        }
-
-        /* 左侧上传区 */
-        .input-panel {
-            flex: 1.2;
-            min-width: 260px;
-            background: #ffffff;
-            border-radius: 1.5rem;
-            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.04);
-            border: 1px solid #eef2f8;
-            display: flex;
-            flex-direction: column;
-            height: fit-content;
-        }
-
-        /* 右侧结果区 */
-        .result-panel {
-            flex: 2;
-            min-width: 300px;
-            background: #ffffff;
-            border-radius: 1.5rem;
-            border: 1px solid #eef2f8;
-            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.04);
-            display: flex;
-            flex-direction: column;
-            height: fit-content;
-        }
-
-        .section-title {
-            font-size: 1.1rem;
-            font-weight: 600;
-            padding: 1rem 1.5rem 0.4rem 1.5rem;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            border-bottom: 2px solid #eef2f6;
-            margin-bottom: 0.8rem;
-            flex-shrink: 0;
-        }
-
-        .section-title i {
-            color: #2c7da0;
-            font-size: 1.2rem;
-        }
-
-        .upload-area {
-            margin: 0 1.5rem 1rem 1.5rem;
-            border: 2px dashed #cbd5e1;
-            border-radius: 1.2rem;
-            background: #fafcff;
-            padding: 1.5rem 0.8rem;
-            text-align: center;
-            cursor: pointer;
-            transition: 0.2s;
-        }
-
-        .upload-area:hover {
-            border-color: #2c7da0;
-            background: #f0f9ff;
-        }
-
-        .upload-area i {
-            font-size: 2rem;
-            color: #5f9db2;
-            margin-bottom: 8px;
-        }
-
-        .file-info {
-            background: #f1f5f9;
-            margin: 0 1.5rem 0.8rem 1.5rem;
-            padding: 0.5rem 1rem;
-            border-radius: 60px;
-            font-size: 0.8rem;
+        /* 顶部状态栏区域 (模拟原生状态条) */
+        .status-bar {
+            padding: 12px 20px 6px 20px;
+            background-color: #f5f7fb;
             display: flex;
             justify-content: space-between;
-            align-items: center;
+            font-size: 15px;
+            font-weight: 590;
+            color: #1c1e24;
+            letter-spacing: 0.2px;
+            backdrop-filter: blur(10px);
         }
 
-        .textarea-log {
-            margin: 0 1.5rem 1rem 1.5rem;
+        /* 主头部导航 */
+        .nav-header {
+            padding: 8px 20px 12px 20px;
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            border-bottom: 0.5px solid rgba(0,0,0,0.05);
+            background-color: #f5f7fb;
         }
 
-        .textarea-log label {
+        .logo-area h1 {
+            font-size: 28px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #1E3C72, #2A5298);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            letter-spacing: -0.3px;
+        }
+        .logo-area p {
+            font-size: 13px;
+            color: #6c6f78;
             font-weight: 500;
-            font-size: 0.8rem;
-            display: block;
-            margin-bottom: 6px;
+            margin-top: 2px;
+        }
+        .header-actions i {
+            font-size: 22px;
+            color: #2c3e66;
+            background-color: rgba(44,62,102,0.08);
+            padding: 8px;
+            border-radius: 30px;
+            margin-left: 8px;
         }
 
+        /* 卡片通用设计 - 圆润、细腻阴影，像原生组件 */
+        .card {
+            background-color: #ffffff;
+            border-radius: 28px;
+            padding: 20px;
+            margin: 16px 20px;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.02), 0 2px 4px rgba(0, 0, 0, 0.02);
+            transition: all 0.2s ease;
+            border: 0.5px solid rgba(0,0,0,0.03);
+        }
+
+        /* 欢迎卡片带浅色渐变 */
+        .welcome-card {
+            background: linear-gradient(145deg, #ffffff 0%, #fafcff 100%);
+            border: none;
+        }
+
+        .badge {
+            display: inline-block;
+            background-color: #eef2ff;
+            color: #1f4f8f;
+            font-size: 13px;
+            font-weight: 600;
+            padding: 6px 14px;
+            border-radius: 40px;
+            margin-bottom: 12px;
+        }
+
+        /* 智能诊断区域 像即时聊天窗口 */
+        .diagnostic-area {
+            background-color: #ffffff;
+            border-radius: 32px;
+            margin: 8px 20px 0 20px;
+            overflow: hidden;
+        }
+
+        .input-group {
+            background-color: #f8f9fe;
+            border-radius: 24px;
+            padding: 12px;
+            margin-bottom: 16px;
+        }
         textarea {
             width: 100%;
-            border-radius: 1rem;
-            border: 1px solid #cfdfe9;
-            padding: 10px;
-            font-family: 'Menlo', monospace;
-            font-size: 0.75rem;
-            background: #fefefe;
-            resize: vertical;
-        }
-
-        .btn-group {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 12px;
-            margin: 0.5rem 1.5rem 1.2rem 1.5rem;
-        }
-
-        .btn-primary {
-            background: #0f2b3d;
             border: none;
-            color: white;
-            padding: 10px 18px;
-            border-radius: 40px;
-            font-weight: 600;
-            font-size: 0.85rem;
-            cursor: pointer;
-            transition: 0.2s;
-            flex: 1;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-        }
-
-        .btn-primary:hover {
-            background: #1b4f6e;
-            transform: scale(0.98);
-        }
-
-        .btn-outline {
             background: transparent;
-            border: 1px solid #cbdde8;
-            padding: 8px 14px;
-            border-radius: 40px;
-            font-weight: 500;
-            cursor: pointer;
-            transition: 0.2s;
-            flex: 1;
+            font-size: 15px;
+            font-family: ui-monospace, 'Menlo', monospace;
+            resize: vertical;
+            outline: none;
+            padding: 12px 8px;
+            color: #1e293b;
+            line-height: 1.5;
+        }
+        textarea::placeholder {
+            color: #9aa1b2;
+            font-family: system-ui;
+        }
+        .button-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 8px;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .btn-primary {
+            background-color: #1c3f6e;
+            border: none;
+            padding: 12px 18px;
+            border-radius: 44px;
+            font-weight: 590;
+            font-size: 15px;
+            color: white;
             display: inline-flex;
             align-items: center;
-            justify-content: center;
             gap: 8px;
+            cursor: pointer;
+            transition: 0.2s;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
         }
-
+        .btn-primary:active { transform: scale(0.97); background-color: #0f2d4e; }
+        .btn-outline {
+            background-color: transparent;
+            border: 1px solid #cdd9f0;
+            padding: 10px 16px;
+            border-radius: 44px;
+            font-size: 14px;
+            font-weight: 500;
+            color: #2c5282;
+            cursor: pointer;
+            transition: 0.2s;
+        }
         .example-buttons {
-            margin: 0 1.5rem 1.5rem 1.5rem;
             display: flex;
             gap: 8px;
-            flex-wrap: wrap;
-            border-top: 1px solid #eef2f6;
-            padding-top: 1rem;
+        }
+        .ex-btn {
+            background: #eef2ff;
+            border-radius: 30px;
+            padding: 6px 14px;
+            font-size: 12px;
+            font-weight: 500;
+            color: #1f4f8f;
+            cursor: pointer;
         }
 
-        .badge-example {
-            background: #eef2ff;
-            padding: 6px 12px;
-            border-radius: 40px;
-            font-size: 0.7rem;
-            font-weight: 500;
-            cursor: pointer;
+        /* 诊断结果卡片 优雅布局 */
+        .result-section {
+            margin-top: 24px;
+            background: #fefefe;
+            border-radius: 28px;
             transition: all 0.2s;
         }
-
-        .result-card {
-            margin: 0 1.2rem 1.5rem 1.2rem;
-            flex: 1;
+        .diag-item {
+            background: #f9fafc;
+            border-radius: 20px;
+            padding: 16px;
+            margin-bottom: 14px;
         }
-
-        .result-item {
-            margin-bottom: 1.2rem;
-            border-radius: 1rem;
-            background: #f9fbfd;
-            padding: 0.9rem 1.2rem;
-            border-left: 4px solid;
-            transition: 0.1s;
-        }
-
-        .result-item.summary { border-left-color: #3b82f6; }
-        .result-item.cause { border-left-color: #f97316; }
-        .result-item.solution { border-left-color: #10b981; }
-
-        .result-header {
-            font-weight: 700;
-            font-size: 0.9rem;
+        .diag-title {
+            font-weight: 650;
+            font-size: 16px;
             margin-bottom: 8px;
             display: flex;
             align-items: center;
-            gap: 6px;
+            gap: 8px;
+            color: #1e2a3e;
         }
-
-        .result-content {
-            font-size: 0.85rem;
+        .diag-desc {
+            font-size: 14px;
+            color: #2d3a4b;
             line-height: 1.45;
-            color: #1e2f3a;
+        }
+        .code-block {
+            background: #1e1f2c;
+            color: #e2e8f0;
+            padding: 12px;
+            border-radius: 16px;
+            font-family: monospace;
+            font-size: 13px;
+            margin-top: 10px;
+            overflow-x: auto;
         }
 
-        .command-box {
-            background: #0f172a;
-            color: #e2e8f0;
-            padding: 8px 12px;
-            border-radius: 14px;
-            font-family: monospace;
-            font-size: 0.75rem;
-            margin: 10px 0 6px;
+        /* 特性表格 (对比传统工具) */
+        .compare-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+        .compare-row {
             display: flex;
             justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 6px;
+            align-items: baseline;
+            padding: 8px 0;
+            border-bottom: 0.5px solid #edf0f5;
+        }
+        .compare-label {
+            font-weight: 600;
+            color: #2c3e50;
+            width: 110px;
+            font-size: 14px;
+        }
+        .compare-value {
+            flex: 1;
+            font-size: 14px;
+            color: #3f5468;
+        }
+        .our-badge {
+            color: #1f6e43;
+            font-weight: 600;
         }
 
-        .copy-btn {
-            background: #334155;
-            border: none;
-            padding: 4px 10px;
-            border-radius: 30px;
-            color: white;
-            font-size: 0.65rem;
+        .tech-steps {
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+        }
+        .step {
+            display: flex;
+            gap: 14px;
+            align-items: flex-start;
+        }
+        .step-num {
+            background: #e2ebf6;
+            width: 32px;
+            height: 32px;
+            border-radius: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            color: #1f4f8f;
+        }
+
+        .footer-note {
+            text-align: center;
+            padding: 24px 20px 32px;
+            color: #7e8493;
+            font-size: 13px;
+        }
+
+        /* PC 适配 - 更像是iPad / Desktop 应用 居中宽卡片感 */
+        @media (min-width: 768px) {
+            .app-container {
+                max-width: 1000px;
+                margin: 0 auto;
+                background-color: #f5f7fb;
+                box-shadow: none;
+            }
+            .two-columns {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 16px;
+                margin: 0 20px;
+            }
+            .two-columns > .card {
+                flex: 1;
+                margin: 0;
+            }
+            .diagnostic-area {
+                margin: 8px 20px 0 20px;
+            }
+            .tech-steps {
+                flex-direction: row;
+                gap: 20px;
+            }
+            .step { flex: 1; flex-direction: column; align-items: center; text-align: center; }
+            .compare-row .compare-label { width: 130px; }
+        }
+
+        /* 极简交互反馈 */
+        i, .btn-primary, .ex-btn, .btn-outline {
             cursor: pointer;
         }
-
-        .loading {
-            text-align: center;
-            padding: 2rem;
-            color: #5f8ea0;
+        .no-select {
+            user-select: none;
         }
 
-        /* 移动端紧凑调整 */
-        @media (max-width: 860px) {
-            .header {
-                padding: 0.9rem 1rem;
-            }
-            .dashboard {
-                padding: 1rem;
-                gap: 1rem;
-            }
-            .section-title {
-                padding: 0.8rem 1rem 0.2rem 1rem;
-            }
-            .upload-area, .textarea-log, .btn-group, .example-buttons, .result-card {
-                margin-left: 1rem;
-                margin-right: 1rem;
-            }
-            .btn-primary, .btn-outline {
-                width: 100%;
-            }
+        /* 隐藏滚动条但保留功能 */
+        ::-webkit-scrollbar {
+            width: 4px;
         }
-
-        @media (max-width: 600px) {
-            .command-box {
-                flex-direction: column;
-                align-items: flex-start;
-            }
+        .fade-in {
+            animation: fadeIn 0.25s ease-out;
         }
-
-        .hidden {
-            display: none;
-        }
-
-        .toast-msg {
-            position: fixed;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: #1e293b;
-            color: white;
-            padding: 8px 18px;
-            border-radius: 40px;
-            font-size: 0.75rem;
-            z-index: 999;
-            opacity: 0;
-            transition: opacity 0.2s;
-            pointer-events: none;
-            white-space: normal;
-            text-align: center;
-            max-width: 90vw;
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(6px);}
+            to { opacity: 1; transform: translateY(0);}
         }
     </style>
 </head>
 <body>
-<div class="fullscreen-container">
-    <div class="header">
-        <h1>
-            <i class="fas fa-microchip"></i> 
-            日志分析与故障定位系统
-        </h1>
-        <div class="sub">
-            <i class="fas fa-robot"></i> 全屏智能排障 · 让报错像翻译一样易懂
+<div class="app-container">
+    <!-- 仿原生状态栏 -->
+    <div class="status-bar">
+        <span>9:41</span>
+        <span><i class="fas fa-signal"></i> <i class="fas fa-battery-full"></i></span>
+    </div>
+    <!-- 主头部 -->
+    <div class="nav-header">
+        <div class="logo-area">
+            <h1>LogMind</h1>
+            <p>日志 · 智能剖析</p>
+        </div>
+        <div class="header-actions">
+            <i class="fas fa-microphone"></i>
+            <i class="fas fa-sliders-h"></i>
         </div>
     </div>
 
-    <div class="dashboard">
-        <!-- 左侧输入面板 -->
-        <div class="input-panel">
-            <div class="section-title">
-                <i class="fas fa-cloud-upload-alt"></i> 
-                <span>日志来源</span>
-            </div>
-            <div id="dropZone" class="upload-area">
-                <i class="fas fa-file-alt"></i>
-                <p><strong>点击或拖拽日志文件</strong> (.log / .txt)</p>
-                <p style="font-size:0.7rem;">自动提取错误上下文</p>
-                <input type="file" id="fileInput" accept=".log,.txt,text/plain" style="display: none;" />
-            </div>
-            <div id="fileStatus" class="file-info hidden">
-                <span><i class="fas fa-check-circle"></i> <span id="fileName"></span></span>
-                <button id="clearFileBtn" style="background: none; border:none; cursor:pointer;"><i class="fas fa-times-circle"></i></button>
-            </div>
+    <!-- 欢迎/简介卡片 -->
+    <div class="card welcome-card">
+        <div class="badge"><i class="fas fa-robot"></i> AI 驱动 · 零基础排障</div>
+        <h2 style="font-size: 22px; font-weight: 640; margin-bottom: 6px;">让报错像对话一样简单</h2>
+        <p style="color: #475569; margin-top: 6px;">粘贴日志 → 智能诊断 → 获得「人话+方案」<br>不再翻阅“天书”日志，告别迷茫排查</p>
+    </div>
 
-            <div class="textarea-log">
-                <label><i class="fas fa-terminal"></i> 粘贴报错日志或终端信息</label>
-                <textarea id="logTextarea" rows="5" placeholder="示例：&#10;------ kernel abnormal reboot records ------&#10;kernel poweroff   : AP_WDT&#10;ERROR 2003 (HY000): Can't connect to MySQL server on 'localhost' (10061)"></textarea>
-            </div>
-
-            <div class="btn-group">
-                <button id="analyzeBtn" class="btn-primary"><i class="fas fa-brain"></i> 智能诊断</button>
-                <button id="clearBtn" class="btn-outline"><i class="fas fa-eraser"></i> 清空</button>
-            </div>
-
-            <div class="example-buttons">
-                <span style="font-size:0.7rem; color:#5f7d8f;">📋 快速案例：</span>
-                <span class="badge-example" data-demo="reboot"><i class="fas fa-mobile-alt"></i> 手机重启</span>
-                <span class="badge-example" data-demo="mysql"><i class="fas fa-database"></i> MySQL连不上</span>
-                <span class="badge-example" data-demo="wdt"><i class="fas fa-microchip"></i> 看门狗超时</span>
-            </div>
+    <!-- 核心智能诊断组件 (核心交互区) -->
+    <div class="diagnostic-area card" style="padding-bottom: 24px;">
+        <div style="font-weight: 600; font-size: 17px; margin-bottom: 12px; display: flex; gap: 8px; align-items: center;">
+            <i class="fas fa-magic" style="color: #2a5c9e;"></i> 智能诊断助手
         </div>
-
-        <!-- 右侧诊断结果 -->
-        <div class="result-panel">
-            <div class="section-title">
-                <i class="fas fa-stethoscope"></i>
-                <span>AI 智能诊断结果</span>
-                <span style="font-size:0.65rem; margin-left:auto; background:#eef2ff; padding:2px 8px; border-radius:40px;"><i class="fas fa-magic"></i> 上下文推理</span>
-            </div>
-            <div id="resultContainer" class="result-card">
-                <div style="text-align: center; padding: 2rem 0.5rem; color: #94a3b8;">
-                    <i class="fas fa-robot" style="font-size: 2.2rem; margin-bottom: 1rem; display: block;"></i>
-                    上传日志或点击案例，AI将分析根因<br>输出摘要 · 定位 · 可执行修复命令
+        <div class="input-group">
+            <textarea id="logInput" rows="4" placeholder="📄 粘贴或输入您的错误日志...&#10;例如：kernel abnormal reboot records 或 MySQL ERROR 2003..."></textarea>
+            <div class="button-row">
+                <div class="example-buttons">
+                    <span class="ex-btn" data-example="kernel">📱 手机重启案例</span>
+                    <span class="ex-btn" data-example="mysql">🗄️ 数据库连不上</span>
+                </div>
+                <div>
+                    <label for="fileUpload" class="btn-outline" style="display: inline-flex; gap: 6px; margin-right: 8px;"><i class="fas fa-upload"></i> 上传日志</label>
+                    <input type="file" id="fileUpload" accept=".log,.txt" style="display: none;">
+                    <button class="btn-primary" id="analyzeBtn"><i class="fas fa-stethoscope"></i> 智能分析</button>
                 </div>
             </div>
         </div>
+
+        <!-- 诊断结果显示区 -->
+        <div id="resultContainer" class="result-section">
+            <div style="display: flex; justify-content: center; padding: 20px 0 10px; color: #8e9aaf;">
+                <i class="fas fa-arrow-down"></i> 诊断结果将显示于此
+            </div>
+            <!-- 动态填充诊断结果 -->
+        </div>
     </div>
-    <!-- 底栏已完全移除 -->
+
+    <!-- 亮点对比 & 技术实现 双列布局 (PC适配优雅) -->
+    <div class="two-columns">
+        <!-- 比传统工具强在哪 -->
+        <div class="card">
+            <div style="font-size: 18px; font-weight: 650; margin-bottom: 18px;"><i class="fas fa-chart-line"></i> 跨越式提升</div>
+            <div class="compare-grid">
+                <div class="compare-row"><span class="compare-label">分析能力</span><span class="compare-value">传统: 仅高亮 ERROR &nbsp;&nbsp; <span class="our-badge">✓ 深度解析+上下文</span></span></div>
+                <div class="compare-row"><span class="compare-label">使用门槛</span><span class="compare-value">传统: 专家经验 &nbsp;&nbsp; <span class="our-badge">✓ 零基础可用</span></span></div>
+                <div class="compare-row"><span class="compare-label">解决方案</span><span class="compare-value">传统: 只抛异常 &nbsp;&nbsp; <span class="our-badge">✓ 实质性修复命令</span></span></div>
+                <div class="compare-row"><span class="compare-label">部署成本</span><span class="compare-value">商业软件昂贵 &nbsp;&nbsp; <span class="our-badge">✓ API调用·零成本</span></span></div>
+            </div>
+            <div style="margin-top: 20px; background: #eef2ff20; border-radius: 20px; padding: 12px; font-size: 13px; color:#1f3a64"><i class="fas fa-brain"></i> 理解上下文，精准定位深层诱因，告别盲目搜索</div>
+        </div>
+
+        <!-- 技术实现 (三步) -->
+        <div class="card">
+            <div style="font-size: 18px; font-weight: 650; margin-bottom: 18px;"><i class="fas fa-code-branch"></i> 技术内核</div>
+            <div class="tech-steps">
+                <div class="step"><div class="step-num">1</div><div><strong>日志预处理</strong><div style="font-size:13px; color:#4a5b6e">过滤噪音 · 提取时间戳/错误码</div></div></div>
+                <div class="step"><div class="step-num">2</div><div><strong>相似故障匹配</strong><div style="font-size:13px; color:#4a5b6e">故障库+智能匹配历史案例</div></div></div>
+                <div class="step"><div class="step-num">3</div><div><strong>大模型推理</strong><div style="font-size:13px; color:#4a5b6e">生成摘要 · 根因 · 可执行方案</div></div></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 应用创新 + 经典案例演示 (预展示增强信任) -->
+    <div class="card">
+        <div style="font-size: 18px; font-weight: 650; margin-bottom: 16px;"><i class="fas fa-flask"></i> 应用创新 · 真实案例</div>
+        <div style="display: flex; flex-direction: column; gap: 20px;">
+            <!-- 案例一：手机自动重启 -->
+            <div style="background: #F9F9FF; border-radius: 24px; padding: 16px;">
+                <div class="diag-title"><i class="fas fa-mobile-alt"></i> 内核报错 (手机自动重启)</div>
+                <div style="font-family: monospace; background:#f1f3f8; padding: 8px; border-radius: 16px; font-size:12px; margin-bottom: 12px;">
+                    kernel abnormal reboot records : AP_WDT timeout , Power_keys_long_press
+                </div>
+                <div><span class="badge" style="background:#eef2ff;">📌 问题摘要</span> <span style="font-size:14px;">内核因应用看门狗(AP_WDT)超时主动关机并重启</span></div>
+                <div><span class="badge" style="background:#eef2ff;">🎯 原因定位</span> <span style="font-size:14px;">系统关键进程未及时喂狗，触发硬件超时复位(高负载/死锁)</span></div>
+                <div><span class="badge" style="background:#eef2ff;">🛠️ 解决方案</span> <span style="font-size:14px;">抓取调用栈 → 排查可疑应用 → 恢复出厂/检测主板</span></div>
+            </div>
+            <!-- 案例二：数据库连不上 -->
+            <div style="background: #F9F9FF; border-radius: 24px; padding: 16px;">
+                <div class="diag-title"><i class="fas fa-database"></i> MySQL连接拒绝</div>
+                <div style="font-family: monospace; background:#f1f3f8; padding: 8px; border-radius: 16px; font-size:12px; margin-bottom: 12px;">
+                    ERROR 2003 (HY000): Can't connect to MySQL server on 'localhost' (10061)
+                </div>
+                <div><span class="badge" style="background:#eef2ff;">📌 问题摘要</span> <span style="font-size:14px;">本地MySQL连接被拒绝，网络层连接错误</span></div>
+                <div><span class="badge" style="background:#eef2ff;">🎯 原因定位</span> <span style="font-size:14px;">MySQL服务未启动 或 3306端口拦截</span></div>
+                <div><span class="badge" style="background:#eef2ff;">🛠️ 解决方案</span> <span style="font-size:14px;">systemctl start mysql & ufw allow 3306</span></div>
+                <div class="code-block">sudo systemctl status mysql → sudo systemctl start mysql → sudo ufw allow 3306</div>
+            </div>
+        </div>
+        <div style="margin-top: 16px; font-size:13px; background:#eef2ff; padding: 12px; border-radius: 20px; color:#2c5282;">
+            <i class="fas fa-cloud-upload-alt"></i> 上传日志文件即可自动生成深度报告，精准定位“疑难杂症”
+        </div>
+    </div>
+
+    <!-- 商业价值 & 未来发展 -->
+    <div class="two-columns" style="margin-bottom: 8px;">
+        <div class="card">
+            <i class="fas fa-chart-simple" style="font-size: 20px; margin-bottom: 12px; display: inline-block;"></i>
+            <h3 style="font-weight: 650; font-size: 18px;">商业价值</h3>
+            <ul style="margin-top: 12px; list-style: none; padding-left: 4px;">
+                <li style="margin-bottom: 10px;">✓ 缩短MTTR(平均修复时间) <i class="fas fa-hourglass-half"></i></li>
+                <li style="margin-bottom: 10px;">✓ 降低对专业运维的依赖 · 降本增效</li>
+                <li style="margin-bottom: 10px;">✓ 面向学生/极客/中小企业，平滑排障曲线</li>
+            </ul>
+        </div>
+        <div class="card">
+            <i class="fas fa-road" style="font-size: 20px; margin-bottom: 12px;"></i>
+            <h3 style="font-weight: 650; font-size: 18px;">未来发展</h3>
+            <ul style="margin-top: 12px; list-style: none; padding-left: 4px;">
+                <li style="margin-bottom: 10px;">🚀 自动修复闭环: 检测→定位→自动修复</li>
+                <li style="margin-bottom: 10px;">📚 持续丰富故障库 + 真实案例生态</li>
+                <li style="margin-bottom: 10px;">🔌 集成至CI/CD、监控系统一键排障</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="footer-note">
+        <i class="fas fa-shield-alt"></i> 让每个人轻松解决报错 · 智能助手 零门槛排障
+    </div>
 </div>
-<div id="toastMsg" class="toast-msg"></div>
 
 <script>
-    // ---------- 智能诊断核心 (模拟AI推理，覆盖多种典型故障) ----------
-    function mockAIDiagnosis(rawLogText) {
-        if (!rawLogText || rawLogText.trim() === "") {
+    // ------ 模拟智能诊断库 (基于预设 + 关键词匹配，展现产品智能效果)
+    function smartDiagnose(logText) {
+        if (!logText || logText.trim() === "") {
+            return { summary: "未检测到有效日志", reason: "请粘贴错误日志或上传日志文件", solution: "尝试上方示例日志体验智能诊断" };
+        }
+        const lowerLog = logText.toLowerCase();
+        // 内核看门狗 / 手机重启案例 - kernel abnormal reboot, AP_WDT, Power_keys
+        if (lowerLog.includes("kernel") && (lowerLog.includes("abnormal") || lowerLog.includes("reboot") || lowerLog.includes("ap_wdt") || lowerLog.includes("power_key"))) {
             return {
-                summary: "未检测到有效日志内容",
-                cause: "请提供报错日志或终端输出信息，以便AI分析根本原因。",
-                solution: "复制完整错误信息后重新诊断，或使用示例日志体验智能排障。",
-                commands: []
+                summary: "内核因应用看门狗（AP_WDT）超时主动关机并重启",
+                reason: "系统关键进程（如系统服务）未及时喂狗，触发硬件超时复位（常见于系统高负载、死锁）。",
+                solution: "1. 抓取超时前最后进程调用栈：`cat /proc/last_kmsg`\n2. 检查近期安装的应用或系统更新，回滚可疑软件\n3. 备份数据恢复出厂设置，若仍频繁发生则可能为主板硬件故障，需送修。"
             };
         }
-        const lowerLog = rawLogText.toLowerCase();
-        // 内核看门狗 / 手机自动重启 (AP_WDT / Power_keys / watchdog)
-        if (lowerLog.includes("ap_wdt") || (lowerLog.includes("kernel abnormal reboot") || lowerLog.includes("power_keys_long_press") || (lowerLog.includes("watchdog") && lowerLog.includes("reboot")) || lowerLog.includes("soft lockup"))) {
+        // MySQL ERROR 2003 / connection refused
+        if (lowerLog.includes("mysql") && (lowerLog.includes("error 2003") || lowerLog.includes("can't connect") || lowerLog.includes("10061") || lowerLog.includes("connection refused"))) {
             return {
-                summary: "内核因应用看门狗（AP_WDT）超时而主动关机并重启",
-                cause: "系统关键进程未及时喂狗，触发硬件超时复位。常见于系统高负载、进程死锁或驱动异常。",
-                solution: "1. 抓取超时前的进程调用栈（ramoops/pstore）\n2. 检查最近安装的应用或系统更新，卸载可疑软件或回滚\n3. 若频繁发生，备份数据恢复出厂设置；仍无效可能为主板硬件故障。",
-                commands: ["cat /sys/fs/pstore/console-ramoops", "dmesg | grep -i watchdog", "logcat -b events | grep -i watchdog   # Android环境"]
+                summary: "应用程序在尝试连接本地MySQL数据库时被拒绝连接，属于网络层连接错误。",
+                reason: "MySQL服务未启动，或3306端口被系统防火墙拦截（依据日志关键词“Connection refused”）。",
+                solution: "1. 检查状态: `systemctl status mysql`\n2. 启动服务: `systemctl start mysql`\n3. 放行端口: `ufw allow 3306`\n(Windows请检查服务管理器和防火墙入站规则)"
             };
         }
-        // MySQL 连接错误 2003 / 10061 / connection refused
-        else if (lowerLog.includes("error 2003") || lowerLog.includes("can't connect to mysql") || lowerLog.includes("10061") || (lowerLog.includes("mysql") && lowerLog.includes("connection refused"))) {
+        // 通用错误覆盖例如 connection refused 非mysql
+        if (lowerLog.includes("connection refused") || lowerLog.includes("timeout")) {
             return {
-                summary: "应用程序连接本地MySQL数据库失败，网络层拒绝连接",
-                cause: "MySQL服务未启动，或3306端口被防火墙/iptables拦截。日志关键词 'Connection refused' 确认TCP握手失败。",
-                solution: "启动MySQL服务并放行防火墙端口，验证监听状态。",
-                commands: ["systemctl status mysql", "systemctl start mysql", "ufw allow 3306", "netstat -tlnp | grep 3306"]
+                summary: "网络连接被拒绝或服务无响应",
+                reason: "目标服务可能未启动/端口错误/防火墙阻断，导致TCP握手失败。",
+                solution: "检查对应服务运行状态，使用 `telnet 127.0.0.1 端口` 测试连通性，并确认防火墙策略。"
             };
         }
-        // 内核panic / Oops
-        else if (lowerLog.includes("kernel panic") || lowerLog.includes("oops") || lowerLog.includes("bug: soft lockup")) {
-            return {
-                summary: "系统内核发生致命错误导致崩溃或重启",
-                cause: "内核空指针异常、驱动不兼容或内存损坏，常与第三方内核模块或硬件故障有关。",
-                solution: "收集kdump/crash转储，分析vmcore；尝试升级内核或回滚驱动；运行内存诊断工具。",
-                commands: ["journalctl -k -b -1 | tail -100", "crash /var/crash/vmcore /usr/lib/debug/boot/vmlinux", "mcelog --client"]
-            };
-        }
-        // 通用网络连接超时/拒绝 (非MySQL)
-        else if (lowerLog.includes("connection refused") || lowerLog.includes("timeout") || (lowerLog.includes("failed") && lowerLog.includes("port"))) {
-            return {
-                summary: "网络连接失败，目标服务无响应或被拒绝",
-                cause: "服务未监听端口、防火墙规则拦截或网络路由配置错误。",
-                solution: "检查目标服务状态，验证防火墙配置及端口监听，使用telnet/nc测试连通性。",
-                commands: ["ss -tlnp | grep :端口号", "systemctl status 服务名", "iptables -L -n", "telnet 目标IP 端口"]
-            };
-        }
-        // 应用异常栈 (Java/Python/Node)
-        else if (lowerLog.includes("exception") || lowerLog.includes("stacktrace") || lowerLog.includes("nullpointer") || lowerLog.includes("error:")) {
-            let lang = lowerLog.includes("java") ? "Java" : (lowerLog.includes("python") ? "Python" : (lowerLog.includes("node") ? "Node.js" : "应用"));
-            return {
-                summary: `${lang}应用运行时抛出未处理异常，导致功能中断`,
-                cause: "代码逻辑错误、空指针、依赖缺失或配置不当，根据异常栈可定位具体类与方法。",
-                solution: "检查异常链，定位首个Caused by异常；修复空指针/数组越界或资源未关闭问题，增强容错。",
-                commands: ["grep -A 20 'Exception' app.log", "修复后重新构建部署", "增加try-catch并记录详细上下文"]
-            };
-        }
-        // 默认通用智能解析
-        else {
-            return {
-                summary: "日志中检测到异常信号，需结合上下文进一步排查",
-                cause: "AI识别到非预期行为，可能源于配置、权限或资源瓶颈。未匹配标准故障签名，建议查阅完整日志。",
-                solution: "检查系统资源(CPU/内存/磁盘)，查看日志前后时间窗口；可使用故障知识库搜索核心关键词。",
-                commands: ["dmesg -T | tail -30", "journalctl -xe -n 50", "grep -E 'ERROR|FATAL|CRITICAL' /var/log/syslog"]
-            };
-        }
+        // 默认兜底 (体现简单ai建议)
+        return {
+            summary: "已捕获潜在的运行时报错",
+            reason: "根据日志特征，可能涉及配置异常或资源瓶颈，需要结合上下文深入分析。",
+            solution: "建议检查相关服务状态，查看是否有依赖缺失; 可尝试重启服务或查看系统资源占用。\n提示：使用LogMind大数据模型可提供更精准的根因分析。"
+        };
     }
 
-    // 辅助显示诊断结果
-    function displayResult(result) {
+    // 渲染诊断结果
+    function renderDiagnosis(logText) {
+        const diag = smartDiagnose(logText);
         const container = document.getElementById("resultContainer");
-        if (!container) return;
-
-        let commandsHtml = "";
-        if (result.commands && result.commands.length) {
-            commandsHtml = `<div style="margin-top: 10px;"><div style="font-weight:500; margin-bottom: 5px; font-size:0.8rem;">📋 可执行命令</div>`;
-            result.commands.forEach(cmd => {
-                commandsHtml += `
-                    <div class="command-box">
-                        <code style="word-break:break-all;">${escapeHtml(cmd)}</code>
-                        <button class="copy-btn" data-cmd="${escapeHtml(cmd)}"><i class="fas fa-copy"></i> 复制</button>
-                    </div>
-                `;
-            });
-            commandsHtml += `</div>`;
-        }
-
-        const html = `
-            <div class="result-item summary">
-                <div class="result-header"><i class="fas fa-quote-left" style="color:#3b82f6"></i> 📄 问题摘要</div>
-                <div class="result-content">${escapeHtml(result.summary)}</div>
-            </div>
-            <div class="result-item cause">
-                <div class="result-header"><i class="fas fa-search" style="color:#f97316"></i> 🔍 原因定位</div>
-                <div class="result-content">${escapeHtml(result.cause)}</div>
-            </div>
-            <div class="result-item solution">
-                <div class="result-header"><i class="fas fa-tools" style="color:#10b981"></i> 🛠️ 解决方案</div>
-                <div class="result-content">${escapeHtml(result.solution).replace(/\n/g, '<br>')}</div>
-                ${commandsHtml}
+        container.innerHTML = `
+            <div class="fade-in" style="animation: fadeIn 0.2s ease-out;">
+                <div class="diag-item">
+                    <div class="diag-title"><i class="fas fa-clipboard-list"></i> 问题摘要</div>
+                    <div class="diag-desc">${escapeHtml(diag.summary)}</div>
+                </div>
+                <div class="diag-item">
+                    <div class="diag-title"><i class="fas fa-bullseye"></i> 原因定位</div>
+                    <div class="diag-desc">${escapeHtml(diag.reason)}</div>
+                </div>
+                <div class="diag-item">
+                    <div class="diag-title"><i class="fas fa-tools"></i> 解决方案</div>
+                    <div class="diag-desc" style="white-space: pre-line;">${escapeHtml(diag.solution)}</div>
+                </div>
+                <div style="margin-top: 12px; font-size: 12px; text-align: right; color:#8aa0bc;"><i class="fas fa-microchip"></i> 智能推理 · 故障库匹配</div>
             </div>
         `;
-        container.innerHTML = html;
-
-        // 绑定复制按钮事件
-        document.querySelectorAll('.copy-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const cmd = btn.getAttribute('data-cmd');
-                if (cmd) {
-                    navigator.clipboard.writeText(cmd).then(() => {
-                        showToast(`✅ 命令已复制: ${cmd.substring(0, 50)}${cmd.length>50?'…':''}`);
-                    }).catch(() => {
-                        showToast("⚠️ 手动复制");
-                    });
-                }
-            });
-        });
     }
 
     function escapeHtml(str) {
-        if (!str) return "";
         return str.replace(/[&<>]/g, function(m) {
             if (m === '&') return '&amp;';
             if (m === '<') return '&lt;';
             if (m === '>') return '&gt;';
             return m;
+        }).replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, function(c) {
+            return c;
         });
     }
 
-    function showToast(msg, duration = 2500) {
-        const toast = document.getElementById("toastMsg");
-        toast.textContent = msg;
-        toast.style.opacity = "1";
-        setTimeout(() => {
-            toast.style.opacity = "0";
-        }, duration);
-    }
-
-    let currentFileContent = null;
-
-    async function getLogContent() {
-        if (currentFileContent) return currentFileContent;
-        const textareaVal = document.getElementById("logTextarea").value;
-        if (textareaVal.trim()) return textareaVal;
-        return "";
-    }
-
-    async function runDiagnosis() {
-        const resultContainer = document.getElementById("resultContainer");
-        resultContainer.innerHTML = `<div class="loading"><i class="fas fa-spinner fa-pulse"></i> AI正在深度分析日志上下文，推测根本原因...</div>`;
-        let logText = await getLogContent();
-        if (!logText || logText.trim() === "") {
-            resultContainer.innerHTML = `<div style="text-align:center; padding:2rem; color:#e87928;"><i class="fas fa-exclamation-triangle"></i> 没有可分析的日志内容，请上传文件、粘贴报错或点选示例。</div>`;
-            return;
-        }
-        setTimeout(() => {
-            const diagnosis = mockAIDiagnosis(logText);
-            displayResult(diagnosis);
-        }, 500);
-    }
-
-    // 文件处理
-    function handleFile(file) {
-        if (!file) return;
-        if (!file.name.match(/\.(log|txt)$/i) && file.type !== 'text/plain') {
-            showToast("请上传 .log 或 .txt 日志文件");
-            return;
-        }
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            currentFileContent = e.target.result;
-            document.getElementById("fileName").innerText = file.name;
-            document.getElementById("fileStatus").classList.remove("hidden");
-            document.getElementById("logTextarea").value = currentFileContent;
-            showToast(`已加载文件: ${file.name}`);
-        };
-        reader.onerror = () => showToast("文件读取失败");
-        reader.readAsText(file, "UTF-8");
-    }
-
-    function clearAll() {
-        currentFileContent = null;
-        document.getElementById("logTextarea").value = "";
-        document.getElementById("fileStatus").classList.add("hidden");
-        document.getElementById("fileName").innerText = "";
-        document.getElementById("fileInput").value = "";
-        const container = document.getElementById("resultContainer");
-        container.innerHTML = `<div style="text-align: center; padding: 2rem 0.5rem; color: #94a3b8;">
-                                    <i class="fas fa-robot" style="font-size: 2.2rem; margin-bottom: 1rem; display: block;"></i>
-                                    已清空，上传日志或粘贴报错开始分析
-                                </div>`;
-        showToast("已清空所有日志内容");
-    }
-
-    function fillDemo(type) {
-        if (type === 'reboot') {
-            const demoLog = `------ kernel abnormal reboot records ------
+    // 预设示例数据
+    const exampleKernelLog = `------ kernel abnormal reboot records ------
 kernel poweroff   : Power_keys_long_press
 record time_stamp : 2026-04-30 14:13:17
 kernel reboot     : reboot_longkey
@@ -639,78 +559,64 @@ kernel poweroff   : AP_WDT
 record time_stamp : 2026-04-30 16:24:25
 kernel reboot     : reboot
 record time_stamp : 2026-04-30 16:24:23`;
-            document.getElementById("logTextarea").value = demoLog;
-            currentFileContent = null;
-            document.getElementById("fileStatus").classList.add("hidden");
-        } else if (type === 'mysql') {
-            const demoMysql = `C:\\Windows\\System32>mysql -u root -p
+    
+    const exampleMySQLLog = `C:\\Windows\\System32>mysql -u root -p
 Enter password: *********
 ERROR 2003 (HY000): Can't connect to MySQL server on 'localhost' (10061)`;
-            document.getElementById("logTextarea").value = demoMysql;
-            currentFileContent = null;
-            document.getElementById("fileStatus").classList.add("hidden");
-        } else if (type === 'wdt') {
-            const wdtLog = `[   67.330124] watchdog: BUG: soft lockup - CPU#3 stuck for 22s!
-[   67.330411] Kernel panic - not syncing: watchdog: soft lockup
-[   67.330499] CPU: 3 PID: 124 Comm: system_server Tainted: P           O
-[   67.330620] Hardware name: Qualcomm Technologies, Inc. AP_WDT triggered`;
-            document.getElementById("logTextarea").value = wdtLog;
-            currentFileContent = null;
-            document.getElementById("fileStatus").classList.add("hidden");
-        }
-        showToast(`已加载示例: ${type==='reboot'?'手机自动重启':(type==='mysql'?'MySQL连接失败':'内核看门狗超时')}`);
-    }
 
-    // 初始化所有事件
-    function init() {
-        const dropZone = document.getElementById("dropZone");
-        const fileInput = document.getElementById("fileInput");
-        const analyzeBtn = document.getElementById("analyzeBtn");
-        const clearBtn = document.getElementById("clearBtn");
-        const clearFileBtn = document.getElementById("clearFileBtn");
-
-        dropZone.addEventListener("click", () => fileInput.click());
-        dropZone.addEventListener("dragover", (e) => {
-            e.preventDefault();
-            dropZone.style.borderColor = "#2c7da0";
-        });
-        dropZone.addEventListener("dragleave", () => {
-            dropZone.style.borderColor = "#cbd5e1";
-        });
-        dropZone.addEventListener("drop", (e) => {
-            e.preventDefault();
-            dropZone.style.borderColor = "#cbd5e1";
-            if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
-        });
-        fileInput.addEventListener("change", (e) => {
-            if (e.target.files.length) handleFile(e.target.files[0]);
-        });
-        analyzeBtn.addEventListener("click", runDiagnosis);
-        clearBtn.addEventListener("click", clearAll);
-        if (clearFileBtn) {
-            clearFileBtn.addEventListener("click", () => {
-                currentFileContent = null;
-                document.getElementById("fileStatus").classList.add("hidden");
-                fileInput.value = "";
-                showToast("已移除文件，当前使用文本框内容");
-            });
+    document.getElementById("analyzeBtn").addEventListener("click", function() {
+        const logContent = document.getElementById("logInput").value;
+        if (!logContent.trim()) {
+            document.getElementById("resultContainer").innerHTML = `<div class="diag-item" style="text-align:center;">⚠️ 请先输入或粘贴日志内容，或点击上方示例按钮。</div>`;
+            return;
         }
-        document.querySelectorAll(".badge-example").forEach(el => {
-            el.addEventListener("click", (e) => {
-                const type = el.getAttribute("data-demo");
-                if (type) fillDemo(type);
-            });
-        });
-        const textarea = document.getElementById("logTextarea");
-        textarea.addEventListener("input", () => {
-            if (currentFileContent) {
-                currentFileContent = null;
-                document.getElementById("fileStatus").classList.add("hidden");
+        renderDiagnosis(logContent);
+    });
+
+    // 示例按钮填充
+    document.querySelectorAll(".ex-btn").forEach(btn => {
+        btn.addEventListener("click", function(e) {
+            const type = this.getAttribute("data-example");
+            if (type === "kernel") {
+                document.getElementById("logInput").value = exampleKernelLog;
+            } else if (type === "mysql") {
+                document.getElementById("logInput").value = exampleMySQLLog;
             }
+            // 自动触发诊断
+            const logVal = document.getElementById("logInput").value;
+            if (logVal.trim()) renderDiagnosis(logVal);
+            else renderDiagnosis(" ");
         });
-    }
+    });
 
-    init();
+    // 文件上传模拟分析 (无需真实后端)
+    const fileInput = document.getElementById("fileUpload");
+    const fakeUploadLabel = document.querySelector("label[for='fileUpload']");
+    fileInput.addEventListener("change", function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(evt) {
+            const content = evt.target.result;
+            document.getElementById("logInput").value = content;
+            renderDiagnosis(content);
+            // 轻反馈
+            const toast = document.createElement("div");
+            toast.innerText = "✅ 日志已加载，智能分析完成";
+            toast.style.position = "fixed"; toast.style.bottom = "20px"; toast.style.left = "20px";
+            toast.style.backgroundColor = "#1e2a3a"; toast.style.color = "white"; toast.style.padding = "8px 18px";
+            toast.style.borderRadius = "40px"; toast.style.fontSize = "13px"; toast.style.zIndex = "999";
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 2000);
+        };
+        reader.readAsText(file, "UTF-8");
+    });
+
+    // 让页面打开时默认展示一个示例？为了新手直观，默认显示mysql示例并诊断
+    window.addEventListener("load", function() {
+        document.getElementById("logInput").value = exampleMySQLLog;
+        renderDiagnosis(exampleMySQLLog);
+    });
 </script>
 </body>
 </html>
